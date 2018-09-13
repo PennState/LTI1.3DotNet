@@ -15,99 +15,30 @@ namespace ConsoleApplication4
     {
         static SecurityTokenHandler _tokenHandler = new JwtSecurityTokenHandler();
 
-        //static string _plainTextSecurityKey = "This is my shared, not so secret, secret!";
-        //static string _plainTextSecurityKey = "abc123";
-
-        //static SecurityKey _signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_plainTextSecurityKey));
-        //static SecurityKey _signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_plainTextSecurityKey));
-
-        //static SigningCredentials _signingCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.HmacSha256Signature, SecurityAlgorithms.Sha256Digest);
-        //static SigningCredentials _signingCredentials = new SigningCredentials(_signingKey, SecurityAlgorithms.RsaSha256, SecurityAlgorithms.RsaSha256Signature);
-
         static void Main(string[] args)
         {
-            //SecurityToken token = GetSampleJWT(out string signedAndEncodedToken);
-            //SecurityToken token = GetLTILaunchJWTSharedKey(out string signedAndEncodedToken);
-
-            //Console.WriteLine("-------------------------------------");
-            //Console.WriteLine("LTI Launch JWT Token From LMS to LTI");
-            //Console.WriteLine("-------------------------------------");
-            //Console.WriteLine($"{JsonConvert.SerializeObject(token, Formatting.Indented)}");
-            //Console.WriteLine();
-            //Console.ReadLine();
-
             DemoData requestData = CreateLtiLaunchSymmetricKeyData();
-            requestData.Dump();
+            //requestData.Dump();
             Console.ReadLine();
 
             DemoData validatedData = new DemoData
             {
-                Token = requestData.Token, // normally would be validated here
+                Token = requestData.Token,
                 ValidationParameters = requestData.ValidationParameters,
             };
+
+            // here we would grab useful stuff out of the token
+
+
             validatedData.Dump();
             Console.ReadLine();
-
-            //var tokenValidationParameters = new TokenValidationParameters()
-            //{
-            //    ValidAudiences = new string[]
-            //    {
-            //        "http://my.website.com",
-            //        "http://my.otherwebsite.com",
-
-            //        "10000000000001"
-            //    },
-            //    ValidIssuers = new string[]
-            //    {
-            //        "http://my.tokenissuer.com",
-            //        "http://my.othertokenissuer.com",
-
-            //        "http://canvas.instructure.com"
-            //    },
-            //    IssuerSigningKey = _signingKey
-            //};
-
-            ////_tokenHandler.ValidateToken(signedAndEncodedToken, tokenValidationParameters, out SecurityToken validatedToken);
-            //SecurityToken validatedToken = token;
-
-            //Console.WriteLine("-------------------------------");
-            //Console.WriteLine("Validated LTI Launch JWT Token");
-            //Console.WriteLine("-------------------------------");
-            //Console.WriteLine();
-            //Console.WriteLine(JsonConvert.SerializeObject(validatedToken, Formatting.Indented));
-            //Console.ReadLine();
         }
-
-        //static SecurityToken GetSampleJWT(out string signedAndEncodedToken)
-        //{
-        //    var claimsIdentity = new ClaimsIdentity(new List<Claim>()
-        //    {
-        //        new Claim(ClaimTypes.NameIdentifier, "myemail@myprovider.com"),
-        //        new Claim(ClaimTypes.Role, "Administrator"),
-        //    }, "Custom");
-
-        //    var securityTokenDescriptor = new SecurityTokenDescriptor()
-        //    {
-        //        Audience = "http://my.website.com",
-        //        Issuer = "http://my.tokenissuer.com",
-        //        Subject = claimsIdentity,
-        //        SigningCredentials = _signingCredentials,
-        //    };
-
-        //    var securityToken = _tokenHandler.CreateToken(securityTokenDescriptor);
-
-        //    signedAndEncodedToken = _tokenHandler.WriteToken(securityToken);
-
-        //    Console.WriteLine(signedAndEncodedToken);
-        //    Console.WriteLine();
-
-        //    return securityToken;
-        //}
 
         static SecurityToken GetLTILaunchJWTSharedKey(out string signedAndEncodedToken)
         {            
             // this JSON would be built up by Canvas and then encoded to a JWT
 
+            /*
             string launchData = @"{
     ""https://purl.imsglobal.org/spec/lti/claim/message_type"":""LtiResourceLinkRequest"",
     ""https://purl.imsglobal.org/spec/lti/claim/version"":""1.3.0"",
@@ -161,6 +92,7 @@ namespace ConsoleApplication4
 	""https://www.instructure.com/roles"":""urn:lti:instrole:ims/lis/Administrator,urn:lti:sysrole:ims/lis/SysAdmin,urn:lti:sysrole:ims/lis/User"",
     ""https://www.instructure.com/canvas_enrollment_state"":""
 }";
+*/
             signedAndEncodedToken = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImtpZCI6IjIwMTgtMDYtMThUMjI6MzM6MjBaIn0.eyJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL2x0aS9jbGFpbS9tZXNzYWdlX3R5cGUiOiJMdGlSZXNvdXJjZUxpbmtSZXF1ZXN0IiwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGkvY2xhaW0vdmVyc2lvbiI6IjEuMy4wIiwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGkvY2xhaW0vcmVzb3VyY2VfbGluayI6eyJpZCI6IjRkZGUwNWU4Y2ExOTczYmNjYTliZmZjMTNlMTU0ODgyMGVlZTkzYTMifSwiYXVkIjoxMDAwMDAwMDAwMDAwMSwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGkvY2xhaW0vZGVwbG95bWVudF9pZCI6IjE6ODg2NWFhMDViNGI3OWI2NGE5MWE4NjA0MmU0M2FmNWVhOGFlNzllYiIsImV4cCI6MTUzNjc5MTM5MCwiaWF0IjoxNTM2Nzg3NzkwLCJpc3MiOiJodHRwczovL2NhbnZhcy5pbnN0cnVjdHVyZS5jb20iLCJub25jZSI6ImU1ZTBhOGVkLTMwMDQtNDViZS04MzgyLTI1MjZhMDA3ZGJlMSIsInN1YiI6IjUzNWZhMDg1ZjIyYjQ2NTVmNDhjZDVhMzZhOTIxNWY2NGMwNjI4MzgiLCJwaWN0dXJlIjoiaHR0cDovL2NhbnZhcy5pbnN0cnVjdHVyZS5jb20vaW1hZ2VzL21lc3NhZ2VzL2F2YXRhci01MC5wbmciLCJlbWFpbCI6ImRtY2NhbGx1bUB1bmljb24ubmV0IiwibmFtZSI6ImRtY2NhbGx1bUB1bmljb24ubmV0IiwiZ2l2ZW5fbmFtZSI6ImRtY2NhbGx1bUB1bmljb24ubmV0IiwiZmFtaWx5X25hbWUiOiIiLCJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL2x0aS9jbGFpbS9saXMiOnsicGVyc29uX3NvdXJjZWRpZCI6bnVsbCwiY291cnNlX29mZmVyaW5nX3NvdXJjZWRpZCI6bnVsbH0sImxvY2FsZSI6ImVuIiwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGkvY2xhaW0vcm9sZXMiOlsiaHR0cDovL3B1cmwuaW1zZ2xvYmFsLm9yZy92b2NhYi9saXMvdjIvaW5zdGl0dXRpb24vcGVyc29uI0FkbWluaXN0cmF0b3IiXSwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGkvY2xhaW0vY29udGV4dCI6eyJpZCI6IjRkZGUwNWU4Y2ExOTczYmNjYTliZmZjMTNlMTU0ODgyMGVlZTkzYTMiLCJsYWJlbCI6IkRNIFRlc3QgMSIsInRpdGxlIjoiRE0gVGVzdCAxIiwidHlwZSI6WyJodHRwOi8vcHVybC5pbXNnbG9iYWwub3JnL3ZvY2FiL2xpcy92Mi9jb3Vyc2UjQ291cnNlT2ZmZXJpbmciXX0sImh0dHBzOi8vcHVybC5pbXNnbG9iYWwub3JnL3NwZWMvbHRpL2NsYWltL3Rvb2xfcGxhdGZvcm0iOnsiZ3VpZCI6Ik9PTjh0ZnI1QUJkNEVLYmFXYmhsaGl1TUNKMENlSVFTVU42aWtWQTU6Y2FudmFzLWxtcyIsIm5hbWUiOiJMVEkgQWR2YW50YWdlIiwidmVyc2lvbiI6ImNsb3VkIiwicHJvZHVjdF9mYW1pbHlfY29kZSI6ImNhbnZhcyJ9LCJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL2x0aS9jbGFpbS9sYXVuY2hfcHJlc2VudGF0aW9uIjp7ImRvY3VtZW50X3RhcmdldCI6ImlmcmFtZSIsImhlaWdodCI6NDAwLCJ3aWR0aCI6ODAwLCJyZXR1cm5fdXJsIjoiaHR0cDovL2NhbnZhcy5kb2NrZXIvY291cnNlcy8xL2V4dGVybmFsX2NvbnRlbnQvc3VjY2Vzcy9leHRlcm5hbF90b29sX3JlZGlyZWN0IiwibG9jYWxlIjoiZW4ifSwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGkvY2xhaW0vY3VzdG9tIjp7fSwiaHR0cHM6Ly93d3cuaW5zdHJ1Y3R1cmUuY29tL2NhbnZhc191c2VyX2lkIjoxLCJodHRwczovL3d3dy5pbnN0cnVjdHVyZS5jb20vY2FudmFzX3VzZXJfbG9naW5faWQiOiJkbWNjYWxsdW1AdW5pY29uLm5ldCIsImh0dHBzOi8vd3d3Lmluc3RydWN0dXJlLmNvbS9jYW52YXNfYXBpX2RvbWFpbiI6ImNhbnZhcy5kb2NrZXIiLCJodHRwczovL3d3dy5pbnN0cnVjdHVyZS5jb20vY2FudmFzX2NvdXJzZV9pZCI6MSwiaHR0cHM6Ly93d3cuaW5zdHJ1Y3R1cmUuY29tL2NhbnZhc193b3JrZmxvd19zdGF0ZSI6ImNsYWltZWQiLCJodHRwczovL3d3dy5pbnN0cnVjdHVyZS5jb20vbGlzX2NvdXJzZV9vZmZlcmluZ19zb3VyY2VkaWQiOm51bGwsImh0dHBzOi8vd3d3Lmluc3RydWN0dXJlLmNvbS9yb2xlcyI6InVybjpsdGk6aW5zdHJvbGU6aW1zL2xpcy9BZG1pbmlzdHJhdG9yLHVybjpsdGk6c3lzcm9sZTppbXMvbGlzL1N5c0FkbWluLHVybjpsdGk6c3lzcm9sZTppbXMvbGlzL1VzZXIiLCJodHRwczovL3d3dy5pbnN0cnVjdHVyZS5jb20vY2FudmFzX2Vucm9sbG1lbnRfc3RhdGUiOiIifQ.c9Qay0rCJy0zE9Td2_jSkN0NqueC0hdFhr50lyc_NombVFzPV4dFEVpiCn_8BGB9yDcAQedXj-KBf6uvcgdmjA";
             return _tokenHandler.ReadToken(signedAndEncodedToken);
         }
@@ -254,8 +186,9 @@ namespace ConsoleApplication4
             data.SigningCredentials = new SigningCredentials(data.SigningKey, SecurityAlgorithms.RsaSha256, SecurityAlgorithms.RsaSha256Signature);
 
             data.Token = _tokenHandler.ReadToken(data.SignedEncodedToken);
+
+            // normally would validate:
             //_tokenHandler.ValidateToken(signedAndEncodedToken, tokenValidationParameters, out SecurityToken validatedToken);
-            //data.Token = validated token
 
             return data;
         }
@@ -271,11 +204,47 @@ namespace ConsoleApplication4
         public TokenValidationParameters ValidationParameters { get; set; }
         public void Dump()
         {
-            Console.WriteLine("-------------------------------------");
-            Console.WriteLine(Name);
-            Console.WriteLine("-------------------------------------");
-            Console.WriteLine($"{JsonConvert.SerializeObject(Token, Formatting.Indented)}");
-            Console.WriteLine();
+            StringBuilder sb = new StringBuilder();
+
+            sb.AppendLine("-------------------------------------");
+            sb.AppendLine(Name);
+            sb.AppendLine("-------------------------------------");
+
+            //sb.AppendLine($"{JsonConvert.SerializeObject(Token, Formatting.Indented)}");
+            //sb.AppendLine();
+
+            var jwtToken = (JwtSecurityToken)Token;
+            var payload = jwtToken.Payload;
+
+            sb.AppendLine($"LTI Version      : {payload["https://purl.imsglobal.org/spec/lti/claim/version"]}");
+            // version detection? For LTI1.1 the version will be in a Form field, and for 1.3 we'll need to unpack the token...or something
+
+            sb.AppendLine($"Name             : {payload["name"]}");
+            sb.AppendLine($"Email            : {payload["email"]}");
+            sb.AppendLine($"Canvas Login Id  : {payload["https://www.instructure.com/canvas_user_login_id"]}");
+            sb.AppendLine($"Canvas Course Id : {payload["https://www.instructure.com/canvas_course_id"]}");
+
+            // IMS defined roles - value is a JSON array
+            sb.AppendLine().AppendLine("IMS Claim Roles (https://purl.imsglobal.org/spec/lti/claim/roles)");
+            string imsRolesJson = payload["https://purl.imsglobal.org/spec/lti/claim/roles"].ToString();
+            string[] imsRoles = JsonConvert.DeserializeObject<string[]>(imsRolesJson);
+            foreach (string imsRole in imsRoles)
+            {
+                sb.AppendLine($"  {imsRole}");
+            }
+
+            // Canvas specific roles
+            sb.AppendLine().AppendLine("Canvas Non-Claim Roles (https://www.instructure.com/roles)");
+            string canvasRolesCsv = payload["https://www.instructure.com/roles"].ToString();
+            string[] canvasRoles = canvasRolesCsv.Split(',');
+            foreach (string canvasRole in canvasRoles)
+            {
+                sb.AppendLine($"  {canvasRole}");
+            }
+
+            // hopefully these Claim keys are the same as with the Form based LTI Requests
+
+            Console.WriteLine(sb.ToString());
         }
     }
 
