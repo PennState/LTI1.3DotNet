@@ -47,3 +47,9 @@ C:\github\LTI1.3DotNet\OAuth2POC\OAuth2POC\obj\Debug\OAuth2POC.csprojResolveAsse
 C:\github\LTI1.3DotNet\OAuth2POC\OAuth2POC\obj\Debug\OAuth2POC.csproj.CoreCompileInputs.cache
 C:\github\LTI1.3DotNet\OAuth2POC\OAuth2POC\obj\Debug\OAuth2POC.dll
 C:\github\LTI1.3DotNet\OAuth2POC\OAuth2POC\obj\Debug\OAuth2POC.pdb
+C:\github\LTI1.3DotNet\OAuth2POC\OAuth2POC\bin\Microsoft.IdentityModel.Protocols.dll
+C:\github\LTI1.3DotNet\OAuth2POC\OAuth2POC\bin\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+C:\github\LTI1.3DotNet\OAuth2POC\OAuth2POC\bin\Microsoft.IdentityModel.Protocols.pdb
+C:\github\LTI1.3DotNet\OAuth2POC\OAuth2POC\bin\Microsoft.IdentityModel.Protocols.xml
+C:\github\LTI1.3DotNet\OAuth2POC\OAuth2POC\bin\Microsoft.IdentityModel.Protocols.OpenIdConnect.pdb
+C:\github\LTI1.3DotNet\OAuth2POC\OAuth2POC\bin\Microsoft.IdentityModel.Protocols.OpenIdConnect.xml

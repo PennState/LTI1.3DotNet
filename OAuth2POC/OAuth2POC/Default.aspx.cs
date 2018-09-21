@@ -4,39 +4,361 @@ using System.Linq;
 using System.Web;
 using System.Web.UI;
 using System.Web.UI.WebControls;
-using System.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
+using System.Net.Security;
+using System.Net;
+using System.Security.Claims;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using System.Web.Security;
+//using System.Web.Mvc;
+using System.Web.Optimization;
+using System.Web.Routing;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace OAuth2POC
 {
     public partial class _Default : Page
     {
+        private static string scopeClaimType = "http://schemas.microsoft.com/identity/claims/scope";
+
+        private static ITokenReplayCache _replayCache = new ReplayCache();
+
         protected void Page_Load(object sender, EventArgs e)
         {
-            // get the JWT token string from Authorization header
-            // This would be sent from Canvas (Consumer) to LTI Tool (Provider) and signed
-            // Here will make one up
-            
-            
-            //SigningCredentials signingCredentials = new SigningCredentials(SecurityKey, SecurityAlgorithms.HmacSha256);
-            //JwtHeader header = new JwtHeader()
-            //JwtSecurityToken token = new JwtSecurityToken()
+            // Initial page load - redirect to the IMS reference platform (acting as the LMS) set up on the IMS website
+            if (!Request.HttpMethod.Equals("POST", StringComparison.InvariantCultureIgnoreCase))
+            {
+                Response.Redirect("https://lti-ri.imsglobal.org/platforms/44/resource_links", true);
+                return;
+            }
 
-            //string authHeader;
-            //authHeader = Request.Form["Authorization"] ?? testAuthHeader;
+            // OAuth 2 Specs for Platform Originating Messages
+            // https://www.imsglobal.org/spec/security/v1p0/#platform-originating-messages
 
-            //string jwtTokenString = authHeader.Substring(authHeader.IndexOf(' '));
+            // Get the JWT Token from the id_token form field.
+            // We could detect the LTI version by checking which OAuth Form Fields are present.
+            // Presence of id_token indicates OAuth 2. Once the token is unpacked, we can check the LTI Version Claim for the exact LTI version
+            string ltiLaunchJwtToken = Request.Form["id_token"];
+            if (ltiLaunchJwtToken == null)
+            {
+                CompleteRequest(HttpStatusCode.Forbidden, "JWT token was not provided in id_token form field");
+                return;
+            }
 
-            //JwtSecurityToken jwtToken = new JwtSecurityToken(jwtTokenString);
+            JwtSecurityTokenHandler tokenHandler = new JwtSecurityTokenHandler();
 
-            // check validity of the token to make sure it has not been tampered with
+            TokenValidationParameters validationParameters = new TokenValidationParameters
+            {
+                // OAuth 2.0 Required Validations (https://www.imsglobal.org/spec/security/v1p0/#message-security-and-message-signing)
 
+                // 5.1.3 Authentication Response Validation
+
+                // 5.1.3.1
+                IssuerSigningKeys = OutOfBandData.GetPlatformSigningKeys(),
+                ValidateIssuerSigningKey = true,
+                RequireSignedTokens = true,
+
+                // 5.1.3.2 
+                ValidIssuer = OutOfBandData.PlatforIssuerId,
+                ValidateIssuer = true,
+
+                // 5.1.3.3
+                ValidAudience = OutOfBandData.ToolClientId,
+                ValidateAudience = true,
+
+                // 5.1.3.4, 5.1.3.5 related to multiple audiences - skip for now
+
+                // 5.1.3.7, 5.1.3.8
+                ValidateLifetime = true,
+                RequireExpirationTime = true,
+
+                // 5.1.3.9
+                TokenReplayCache = _replayCache,                
+                ValidateTokenReplay = true,
+
+                ClockSkew = new TimeSpan(0, 0, 15)
+            };
+
+            try
+            {
+                // Validate token.
+                ClaimsPrincipal claimsPrincipal = tokenHandler.ValidateToken(ltiLaunchJwtToken, validationParameters, out SecurityToken validatedToken);
+
+                // Set the ClaimsPrincipal on the current thread.
+                Thread.CurrentPrincipal = claimsPrincipal;
+
+                // Set the ClaimsPrincipal on HttpContext.Current if the app is running in web hosted environment.
+                if (HttpContext.Current != null)
+                {
+                    HttpContext.Current.User = claimsPrincipal;
+                }
+
+                // If the token is scoped, verify that required permission is set in the scope claim.
+                // See https://www.imsglobal.org/spec/security/v1p0/#access-token-management
+                // 7.1 Access Token Management
+                if (ClaimsPrincipal.Current.FindFirst(scopeClaimType) != null && ClaimsPrincipal.Current.FindFirst(scopeClaimType).Value != "user_impersonation")
+                {
+                    CompleteRequest(HttpStatusCode.Forbidden, "Invalid scope");
+                    return;
+                }
+
+                // now we have validated token and can use the claims containing usable LTI Launch parameters
+                var launchToken = (JwtSecurityToken)validatedToken;
+
+                // Could validate schema here...
+
+                // LTI 1.3 Spec: https://www.imsglobal.org/spec/lti/v1p3
+                // COULD USE EXTENSION POINT ON ValidationParameters PERHAPS
+
+                // 2.1.3 lti_deployment_id must be present
+                if (!launchToken.Payload.ContainsKey("https://purl.imsglobal.org/spec/lti/claim/deployment_id"))
+                {
+                    CompleteRequest(HttpStatusCode.Unauthorized, "Deployment id missing");
+                    return;
+                }
+
+                // 4.3 Required Message Claims
+
+                // 4.3.1 Message type claim
+                string messageType = launchToken.Payload.ContainsKey("https://purl.imsglobal.org/spec/lti/claim/message_type") ?
+                    launchToken.Payload["https://purl.imsglobal.org/spec/lti/claim/message_type"].ToString() : "";
+                if (messageType != "LtiResourceLinkRequest")
+                {
+                    CompleteRequest(HttpStatusCode.BadRequest, "message_type claim missing or invalid");
+                    return;
+                }
+
+                // there are additional validations...
+
+                OutputTokenInfo(launchToken.Payload);
+            }
+            catch (SecurityTokenValidationException stve)
+            {
+                CompleteRequest(HttpStatusCode.Unauthorized, stve.Message);
+                return;
+            }
+            catch (Exception ex2)
+            {
+                CompleteRequest(HttpStatusCode.InternalServerError, ex2.Message);
+                return;
+            }
+
+            CompleteRequest(HttpStatusCode.OK, "");
         }
 
-        private const string testToken = "eyJhbGciOiJSUzI1NiIsImtpZCI6IlZhNWFpcUtlWHZBMTlaRTlTYjl3clJVcVEwbHpnRFVCN2wyWjM1RVR3Yk0ifQ.eyJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL2x0aS9jbGFpbS9tZXNzYWdlX3R5cGUiOiJMdGlSZXNvdXJjZUxpbmtSZXF1ZXN0IiwiZ2l2ZW5fbmFtZSI6Ik5vYmxlIiwiZmFtaWx5X25hbWUiOiJNRCIsIm1pZGRsZV9uYW1lIjoiSGF5bGV5IiwicGljdHVyZSI6Imh0dHA6Ly9leGFtcGxlLm9yZy9Ob2JsZS5qcGciLCJlbWFpbCI6Ik5vYmxlLk1EQGV4YW1wbGUub3JnIiwibmFtZSI6Ik5vYmxlIEhheWxleSBNYXJ2aW4gTUQiLCJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL2x0aS9jbGFpbS9yb2xlcyI6WyJodHRwOi8vcHVybC5pbXNnbG9iYWwub3JnL3ZvY2FiL2xpcy92Mi9pbnN0aXR1dGlvbi9wZXJzb24jU3R1ZGVudCIsImh0dHA6Ly9wdXJsLmltc2dsb2JhbC5vcmcvdm9jYWIvbGlzL3YyL21lbWJlcnNoaXAjTGVhcm5lciIsImh0dHA6Ly9wdXJsLmltc2dsb2JhbC5vcmcvdm9jYWIvbGlzL3YyL21lbWJlcnNoaXAjTWVudG9yIl0sImh0dHBzOi8vcHVybC5pbXNnbG9iYWwub3JnL3NwZWMvbHRpL2NsYWltL3JvbGVfc2NvcGVfbWVudG9yIjpbImh0dHA6Ly9wdXJsLmltc2dsb2JhbC5vcmcvdm9jYWIvbGlzL3YyL2luc3RpdHV0aW9uL3BlcnNvbiNBZG1pbmlzdHJhdG9yIl0sImh0dHBzOi8vcHVybC5pbXNnbG9iYWwub3JnL3NwZWMvbHRpL2NsYWltL3Jlc291cmNlX2xpbmsiOnsiaWQiOiI3MCIsInRpdGxlIjoiQSB0aXRsZSIsImRlc2NyaXB0aW9uIjpudWxsfSwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGkvY2xhaW0vY29udGV4dCI6eyJpZCI6IjI1IiwibGFiZWwiOiJlbmdfMTAxIiwidGl0bGUiOiJFbmcgMTAxIiwidHlwZSI6WyJDb3Vyc2VPZmZlcmluZyJdfSwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGkvY2xhaW0vdG9vbF9wbGF0Zm9ybSI6eyJuYW1lIjoiSmFtZXMgVGVzdCBQbGF0Zm9ybSIsImNvbnRhY3RfZW1haWwiOiIiLCJkZXNjcmlwdGlvbiI6IiIsInVybCI6IiIsInByb2R1Y3RfZmFtaWx5X2NvZGUiOiIiLCJ2ZXJzaW9uIjoiMS4wIn0sImh0dHBzOi8vcHVybC5pbXNnbG9iYWwub3JnL3NwZWMvbHRpLWFncy9jbGFpbS9lbmRwb2ludCI6eyJzY29wZSI6WyJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL2x0aS1hZ3Mvc2NvcGUvbGluZWl0ZW0iLCJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL2x0aS1hZ3Mvc2NvcGUvcmVzdWx0LnJlYWRvbmx5IiwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGktYWdzL3Njb3BlL3Njb3JlIl0sImxpbmVpdGVtcyI6Imh0dHBzOi8vbHRpLXJpLmltc2dsb2JhbC5vcmcvcGxhdGZvcm1zLzI3L2NvbnRleHRzLzI1L2xpbmVfaXRlbXMifSwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGktbnJwcy9jbGFpbS9uYW1lc3JvbGVzZXJ2aWNlIjp7ImNvbnRleHRfbWVtYmVyc2hpcHNfdXJsIjoiaHR0cHM6Ly9sdGktcmkuaW1zZ2xvYmFsLm9yZy9wbGF0Zm9ybXMvMjcvY29udGV4dHMvMjUvbWVtYmVyc2hpcHMuanNvbiIsInNlcnZpY2VfdmVyc2lvbiI6IjIuMCJ9LCJpc3MiOiJodHRwczovL2x0aS1yaS5pbXNnbG9iYWwub3JnIiwiYXVkIjoiMTIzIiwiaWF0IjoxNTMzNzQzOTg1LCJleHAiOjE1MzM3NDQyODUsInN1YiI6ImViN2Q4N2RhZmRiZjRkMzcxMGQwIiwibm9uY2UiOiIyYzZmMWE0YjMzZTNlNDVmNmUxZSIsImh0dHBzOi8vcHVybC5pbXNnbG9iYWwub3JnL3NwZWMvbHRpL2NsYWltL3ZlcnNpb24iOiIxLjMuMCIsImxvY2FsZSI6ImVuLVVTIiwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9sdGkvY2xhaW0vbGF1bmNoX3ByZXNlbnRhdGlvbiI6eyJkb2N1bWVudF90YXJnZXQiOiJpZnJhbWUiLCJoZWlnaHQiOjMyMCwid2lkdGgiOjI0MCwicmV0dXJuX3VybCI6Imh0dHBzOi8vbHRpLXJpLmltc2dsb2JhbC5vcmcvcGxhdGZvcm1zLzI3L3JldHVybnMifSwiaHR0cHM6Ly93d3cuZXhhbXBsZS5jb20vZXh0ZW5zaW9uIjp7ImNvbG9yIjoidmlvbGV0In0sImh0dHBzOi8vcHVybC5pbXNnbG9iYWwub3JnL3NwZWMvbHRpL2NsYWltL2N1c3RvbSI6eyJteUN1c3RvbVZhbHVlIjoxMjN9LCJodHRwczovL3B1cmwuaW1zZ2xvYmFsLm9yZy9zcGVjL2x0aS9jbGFpbS9kZXBsb3ltZW50X2lkIjoiMTIzIn0.CnPQFkE5hxxlA3HzEaKG6qXf_Q9KEkbJEA1Xi-eiUaq8KHKCOyWQn35Yzp-JP12UUCaNtRbz5Y1aLIIpMekco-cgQ4EDs5-kW5hrobpqO-HOwfouszi4SXBczCh181FJLXzFijPQBnfcN6s-veRsT0yD-xjWGzdoftNgQhQJ9fHS5DPhrAYjya4aExbbYz25xcWCpjR_05qzfwjU8cCqDqTEHKFRg5SiTJG2NnrvGG3ukVmPcGJPtdNX85WPHr6-DV4MUGNYVXbIxMCUBEEhhyXcPDJMqvfIJ-vn19QLK_Svw57FedQxq0Ku0jiu2CR29abynyGTXExFuygM16oDfw";
-        private string testAuthHeader = $"Bearer {testToken}";
 
-        private const string toolPublicKey = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsGW9g5La/lm3YuKUSet5 VaWlr8j53MDwDZ5XpyJpv1BohfIHX7qJn1KzO3LMJXIL+K/WfHE+MJCpcAJvzxil iBJmEb2uD9EVIwHVKik6CZ7UuxzGySxhtRRNDUiG8akjTnr6mQbikrRTYTdwGcXj L3RSV7bOy2sbcqBebiXSxt81MMmMYIH6PyctheD3ZWRbo22F0CaiRygfFvirn7rx Gz2GtufR0rHxCqGFQ5eZV4gKUE/KAJlCi/XTrm/BYmBLWO1o2cjWUdqtI3N68h2a t/zSfBozsazAFXjxZHmESaMGGlDF4rqw9EnxOuZp+kc6HMg/or+p4ExPUPpVnlAR XwIDAQAB";
+        private void CompleteRequest(HttpStatusCode statusCode, string statusDescription)
+        {
+            Response.StatusCode = (int)statusCode;
+            Response.StatusDescription = statusDescription;
+
+            if (Response.StatusCode != (int)HttpStatusCode.OK)
+                lblError.Text = $"Error: {statusCode.ToString()} {statusDescription}";
+            else
+                lblError.Text = "";
+
+            HttpContext.Current.ApplicationInstance.CompleteRequest();
+        }
+
+        private void OutputTokenInfo(JwtPayload payload)
+        {
+            lblLaunchIssuer.Text = payload.Val("iss");
+            lblLaunchAudience.Text = payload.Val("aud");
+            lblSubjectId.Text = payload.Val("sub");
+            lblNonce.Text = payload.Val("nonce");
+            lblKeySetUrl.Text = OutOfBandData.PlatformKeySetUrl;
+
+            lblEmail.Text = payload.Val("email");
+            lblUserName.Text = payload.Val("name");
+
+            var contextJson = payload.Val("https://purl.imsglobal.org/spec/lti/claim/context");
+            LtiContext ctx = JsonConvert.DeserializeObject<LtiContext>(contextJson);
+            lblContextCourse.Text = $"({ctx.type[0]} {ctx.id}) {ctx.label}";
+
+            var resourceLinkJson = payload.Val("https://purl.imsglobal.org/spec/lti/claim/resource_link");
+            LtiResourceLink rl = JsonConvert.DeserializeObject<LtiResourceLink>(resourceLinkJson);
+            lblLaunchLink.Text = $"({rl.id}) {rl.description}";
+
+            string imsRolesJson = payload.Val("https://purl.imsglobal.org/spec/lti/claim/roles");
+            string[] imsRoles = JsonConvert.DeserializeObject<string[]>(imsRolesJson);
+            foreach (string imsRole in imsRoles)
+            {
+                blRoles.Items.Add(new ListItem(imsRole));
+            }
+
+            string custom = payload.Val("https://purl.imsglobal.org/spec/lti/claim/custom");
+            var customDict = JsonConvert.DeserializeObject<Dictionary<string, string>>(custom);
+            foreach (var item in customDict)
+            {
+                blCustom.Items.Add(new ListItem($"{item.Key} = {item.Value}", item.Value));
+            }
+
+            // endpoint scopes
+            string endpointsJson = payload.Val("https://purl.imsglobal.org/spec/lti-ags/claim/endpoint");
+            var endpoints = JsonConvert.DeserializeObject<LtiEndpoint>(endpointsJson);
+            foreach (string scope in endpoints.scope)
+            {
+                blScope.Items.Add(scope);
+            }
+
+            // platform
+            string platformJson = payload.Val("https://purl.imsglobal.org/spec/lti/claim/tool_platform");
+            var platform = JsonConvert.DeserializeObject<LtiPlatform>(platformJson);
+            lblPlatform.Text = $"{platform.name}, {platform.version}";
+
+            // launch presentation
+            string presentationJson = payload.Val("https://purl.imsglobal.org/spec/lti/claim/launch_presentation");
+            var presentation = JsonConvert.DeserializeObject<LtiLaunchPresentation>(presentationJson);
+            lblLaunchPresentation.Text = $"{presentation.document_target}, {presentation.width}x{presentation.height}, {presentation.return_url}";
+        }
+    }
+
+    /// <summary>
+    /// This is OAuth 2.0 related data established during out-of-band Tool (LTI) registration process 
+    /// </summary>
+    public class OutOfBandData
+    {
+        // Platform's Issuer Id. In the reference tool Platform Configuration this is called "Audience"
+        public const string PlatforIssuerId = "https://psu.lti13dot.net/lms";
+
+        // Tool's OAuth 2 client_id
+        public const string ToolClientId = "094538B8-3E5F-4713-8EAC-B14B8FCDF9BE";        
+
+        // Platform's public key set discovery URL
+        public const string PlatformKeySetUrl = "https://lti-ri.imsglobal.org/platforms/44/platform_keys/39.json";
+
+        // Platform's Public Keys used for signing
+        public static IEnumerable<SecurityKey> GetPlatformSigningKeys()
+        {
+            List<SecurityKey> platformSigningKeys = new List<SecurityKey>();
+
+            // The issuer and signingKeys are cached for 24 hours. They are updated if any of the conditions in the if condition is true.
+            if (DateTime.UtcNow.Subtract(_stsMetadataRetrievalTime).TotalHours > 24 || !platformSigningKeys.Any())
+            {
+                // Get tenant information that's used to validate incoming jwt tokens
+
+                HttpDocumentRetriever documentRetriver = new HttpDocumentRetriever { RequireHttps = true };
+                OpenIdConnectConfigurationRetriever configRetriever = new OpenIdConnectConfigurationRetriever();
+                ConfigurationManager<OpenIdConnectConfiguration> configManager = new ConfigurationManager<OpenIdConnectConfiguration>(PlatformKeySetUrl, configRetriever, documentRetriver);
+
+                OpenIdConnectConfiguration openIdConfig = configManager.GetConfigurationAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+                JArray platformKeys = (JArray)openIdConfig.AdditionalData["keys"];
+                string additionalData = JsonConvert.SerializeObject(openIdConfig.AdditionalData);
+
+                JsonWebKeySet jsonWebKeySet = new JsonWebKeySet(additionalData);
+                foreach (JsonWebKey key in jsonWebKeySet.Keys)
+                {
+                    // filter to only signing keys since there could be others
+                    if (key.Use.ToLower() != "sig")
+                        continue;
+
+                    if (key.HasPrivateKey)
+                        continue;
+
+                    platformSigningKeys.Add(key);
+                }
+
+                _stsMetadataRetrievalTime = DateTime.UtcNow;
+            }
+
+            return platformSigningKeys;
+        }
+
+        private static DateTime _stsMetadataRetrievalTime = DateTime.MinValue;
+    }
+
+    public static class Extensions
+    {
+        public static string Val(this JwtPayload payload, string key)
+        {
+            if (payload.ContainsKey(key))
+                return payload[key].ToString();
+
+            return "";
+        }
+    }
+    
+    public class ReplayCache : ITokenReplayCache
+    {
+        private Dictionary<string, DateTime> _cache = new Dictionary<string, DateTime>();
+
+        public bool TryAdd(string securityToken, DateTime expiresOn)
+        {
+            // don't add if expiration date is in the past
+            if (expiresOn <= DateTime.UtcNow)
+                return false;
+
+            // add if the token is not found
+            if (!TryFind(securityToken))
+            {
+                // check that token is not in cache since it could be there with an expiration within the time window
+                if (!_cache.ContainsKey(securityToken))
+                    _cache.Add(securityToken, expiresOn);
+
+                return true;
+            }
+
+            return false;
+        }
+
+        public bool TryFind(string securityToken)
+        {
+            if (!_cache.ContainsKey(securityToken))
+                return false;
+
+            // if existing token expiration is within time window, treat it as Not Found
+            DateTime cachedTokenExpiration = _cache[securityToken];
+
+            if (DateTime.UtcNow <= cachedTokenExpiration)
+                return false;
+
+            // existing token is in cache and is not within time window, treat it as Found
+            return true;
+        }
+    }
+
+    public class LtiContext
+    {
+        public string id { get; set; }
+        public string label { get; set; }
+        public string[] type { get; set; }
+    }
+
+    public class LtiResourceLink
+    {
+        public string id { get; set; }
+        public string label { get; set; }
+        public string description { get; set; }
+    }
+
+    public class LtiPlatform
+    {
+        public string name { get; set; }
+        public string contact_email { get; set; }
+        public string description { get; set; }
+        public string url { get; set; }
+        public string product_family_code { get; set; }
+        public string version { get; set; }
+    }
+
+    public class LtiEndpoint
+    {
+        public string[] scope { get; set; }
+        public string lineitem { get; set; }
+        public string lineitems { get; set; }
+    }
+
+    public class LtiLaunchPresentation
+    {
+        public string document_target { get; set; }
+        public int height { get; set; }
+        public int width { get; set; }
+        public string return_url { get; set; }
     }
 }

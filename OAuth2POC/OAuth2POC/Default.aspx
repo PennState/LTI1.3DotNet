@@ -2,41 +2,92 @@
 
 <asp:Content ID="BodyContent" ContentPlaceHolderID="MainContent" runat="server">
 
-    <div class="jumbotron">
-        <h1>ASP.NET</h1>
-        <p class="lead">ASP.NET is a free web framework for building great Web sites and Web applications using HTML, CSS, and JavaScript.</p>
-        <p><a href="http://www.asp.net" class="btn btn-primary btn-lg">Learn more &raquo;</a></p>
-    </div>
+    <asp:Label ID="lblError" runat="server" ForeColor="Red"></asp:Label>
 
-    <div class="row">
-        <div class="col-md-4">
-            <h2>Getting started</h2>
-            <p>
-                ASP.NET Web Forms lets you build dynamic websites using a familiar drag-and-drop, event-driven model.
-            A design surface and hundreds of controls and components let you rapidly build sophisticated, powerful UI-driven sites with data access.
-            </p>
-            <p>
-                <a class="btn btn-default" href="https://go.microsoft.com/fwlink/?LinkId=301948">Learn more &raquo;</a>
-            </p>
-        </div>
-        <div class="col-md-4">
-            <h2>Get more libraries</h2>
-            <p>
-                NuGet is a free Visual Studio extension that makes it easy to add, remove, and update libraries and tools in Visual Studio projects.
-            </p>
-            <p>
-                <a class="btn btn-default" href="https://go.microsoft.com/fwlink/?LinkId=301949">Learn more &raquo;</a>
-            </p>
-        </div>
-        <div class="col-md-4">
-            <h2>Web Hosting</h2>
-            <p>
-                You can easily find a web hosting company that offers the right mix of features and price for your applications.
-            </p>
-            <p>
-                <a class="btn btn-default" href="https://go.microsoft.com/fwlink/?LinkId=301950">Learn more &raquo;</a>
-            </p>
-        </div>
-    </div>
+    <h2>OAuth 2</h2>
+    <table>
+        <tr>
+            <td><strong>Platform Issuer Id (OAuth2 "iss") </strong></td>
+            <td>
+                <asp:Label ID="lblLaunchIssuer" runat="server"></asp:Label></td>
+        </tr>
+        <tr>
+            <td><strong>Tool Client Id / Audience (OAuth2 "aud"):</strong></td>
+            <td>
+                <asp:Label ID="lblLaunchAudience" runat="server"></asp:Label></td>
+        </tr>
+        <tr>
+            <td><strong>Platform Permanent User ID (OAuth2 "sub"):</strong></td>
+            <td>
+                <asp:Label ID="lblSubjectId" runat="server"></asp:Label></td>
+        </tr>
+        <tr>
+            <td><strong>Platform Public Key Set Discovery URL:</strong></td>
+            <td>
+                <asp:Label ID="lblKeySetUrl" runat="server"></asp:Label></td>
+        </tr>
+        <tr>
+            <td><strong>Replay Prevention (OAuth2 "nonce"):</strong></td>
+            <td>
+                <asp:Label ID="lblNonce" runat="server"></asp:Label></td>
+        </tr>
+        </table>
+    <h2>User</h2>
+    <table>
+        <tr>
+            <td><strong>User Name:</strong></td>
+            <td>
+                <asp:Label ID="lblUserName" runat="server"></asp:Label>
+            </td>
+        </tr>
+        <tr>
+            <td><strong>User Email:</strong></td>
+            <td>
+                <asp:Label ID="lblEmail" runat="server"></asp:Label></td>
+        </tr>
+        <tr>
+            <td><strong>User Roles:</strong></td>
+            <td>
+                <asp:BulletedList ID="blRoles" runat="server"></asp:BulletedList>
+            </td>
+        </tr>
+        </table>
+    <h2>Platform</h2>
+    <table>
+        <tr>
+            <td><strong>Platform:</strong></td>
+            <td>
+                <asp:Label ID="lblPlatform" runat="server"></asp:Label></td>
+        </tr>
+        <tr>
+            <td><strong>Platform Context (e.g. Course/Group/Section):</strong></td>
+            <td>
+                <asp:Label ID="lblContextCourse" runat="server"></asp:Label></td>
+        </tr>
+        <tr>
+            <td><strong>Platform LTI Launch Link:</strong></td>
+            <td>
+                <asp:Label ID="lblLaunchLink" runat="server"></asp:Label></td>
+        </tr>
+        <tr>
+            <td><strong>Platform Launch Link Custom Claims:</strong></td>
+            <td>
+                <asp:BulletedList ID="blCustom" runat="server"></asp:BulletedList>
+            </td>
+        </tr>
+        <tr>
+            <td><strong>Platform LTI Presentation:</strong></td>
+            <td>
+                <asp:Label ID="lblLaunchPresentation" runat="server"></asp:Label>
+            </td>
+        </tr>
+        <tr>
+            <td><strong>Scopes:</strong></td>
+            <td>
+                <asp:BulletedList ID="blScope" runat="server"></asp:BulletedList>
+            </td>
+        </tr>
+    </table>
 
+    
 </asp:Content>
