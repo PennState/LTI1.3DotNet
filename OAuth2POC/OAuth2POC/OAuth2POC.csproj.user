@@ -13,8 +13,8 @@
     <VisualStudio>
       <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
         <WebProjectProperties>
-          <StartPageUrl>https://lti-ri.imsglobal.org/platforms/44/resource_links</StartPageUrl>
-          <StartAction>CurrentPage</StartAction>
+          <StartPageUrl>Lti1113.aspx</StartPageUrl>
+          <StartAction>SpecificPage</StartAction>
           <AspNetDebugging>True</AspNetDebugging>
           <SilverlightDebugging>False</SilverlightDebugging>
           <NativeDebugging>False</NativeDebugging>

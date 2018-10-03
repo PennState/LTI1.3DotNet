@@ -1,23 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Web;
 using System.Web.UI;
 using System.Web.UI.WebControls;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
-using System.Net.Security;
 using System.Net;
 using System.Security.Claims;
 using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.IdentityModel.Protocols;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
-using System.Web.Security;
-//using System.Web.Mvc;
-using System.Web.Optimization;
-using System.Web.Routing;
-using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 
 namespace OAuth2POC
@@ -36,6 +26,11 @@ namespace OAuth2POC
                 Response.Redirect("https://lti-ri.imsglobal.org/platforms/44/resource_links", true);
                 return;
             }
+
+            
+
+
+
 
             // OAuth 2 Specs for Platform Originating Messages
             // https://www.imsglobal.org/spec/security/v1p0/#platform-originating-messages
@@ -216,149 +211,5 @@ namespace OAuth2POC
             var presentation = JsonConvert.DeserializeObject<LtiLaunchPresentation>(presentationJson);
             lblLaunchPresentation.Text = $"{presentation.document_target}, {presentation.width}x{presentation.height}, {presentation.return_url}";
         }
-    }
-
-    /// <summary>
-    /// This is OAuth 2.0 related data established during out-of-band Tool (LTI) registration process 
-    /// </summary>
-    public class OutOfBandData
-    {
-        // Platform's Issuer Id. In the reference tool Platform Configuration this is called "Audience"
-        public const string PlatforIssuerId = "https://psu.lti13dot.net/lms";
-
-        // Tool's OAuth 2 client_id
-        public const string ToolClientId = "094538B8-3E5F-4713-8EAC-B14B8FCDF9BE";        
-
-        // Platform's public key set discovery URL
-        public const string PlatformKeySetUrl = "https://lti-ri.imsglobal.org/platforms/44/platform_keys/39.json";
-
-        // Platform's Public Keys used for signing
-        public static IEnumerable<SecurityKey> GetPlatformSigningKeys()
-        {
-            List<SecurityKey> platformSigningKeys = new List<SecurityKey>();
-
-            // The issuer and signingKeys are cached for 24 hours. They are updated if any of the conditions in the if condition is true.
-            if (DateTime.UtcNow.Subtract(_stsMetadataRetrievalTime).TotalHours > 24 || !platformSigningKeys.Any())
-            {
-                // Get tenant information that's used to validate incoming jwt tokens
-
-                HttpDocumentRetriever documentRetriver = new HttpDocumentRetriever { RequireHttps = true };
-                OpenIdConnectConfigurationRetriever configRetriever = new OpenIdConnectConfigurationRetriever();
-                ConfigurationManager<OpenIdConnectConfiguration> configManager = new ConfigurationManager<OpenIdConnectConfiguration>(PlatformKeySetUrl, configRetriever, documentRetriver);
-
-                OpenIdConnectConfiguration openIdConfig = configManager.GetConfigurationAsync(CancellationToken.None).GetAwaiter().GetResult();
-
-                JArray platformKeys = (JArray)openIdConfig.AdditionalData["keys"];
-                string additionalData = JsonConvert.SerializeObject(openIdConfig.AdditionalData);
-
-                JsonWebKeySet jsonWebKeySet = new JsonWebKeySet(additionalData);
-                foreach (JsonWebKey key in jsonWebKeySet.Keys)
-                {
-                    // filter to only signing keys since there could be others
-                    if (key.Use.ToLower() != "sig")
-                        continue;
-
-                    if (key.HasPrivateKey)
-                        continue;
-
-                    platformSigningKeys.Add(key);
-                }
-
-                _stsMetadataRetrievalTime = DateTime.UtcNow;
-            }
-
-            return platformSigningKeys;
-        }
-
-        private static DateTime _stsMetadataRetrievalTime = DateTime.MinValue;
-    }
-
-    public static class Extensions
-    {
-        public static string Val(this JwtPayload payload, string key)
-        {
-            if (payload.ContainsKey(key))
-                return payload[key].ToString();
-
-            return "";
-        }
-    }
-    
-    public class ReplayCache : ITokenReplayCache
-    {
-        private Dictionary<string, DateTime> _cache = new Dictionary<string, DateTime>();
-
-        public bool TryAdd(string securityToken, DateTime expiresOn)
-        {
-            // don't add if expiration date is in the past
-            if (expiresOn <= DateTime.UtcNow)
-                return false;
-
-            // add if the token is not found
-            if (!TryFind(securityToken))
-            {
-                // check that token is not in cache since it could be there with an expiration within the time window
-                if (!_cache.ContainsKey(securityToken))
-                    _cache.Add(securityToken, expiresOn);
-
-                return true;
-            }
-
-            return false;
-        }
-
-        public bool TryFind(string securityToken)
-        {
-            if (!_cache.ContainsKey(securityToken))
-                return false;
-
-            // if existing token expiration is within time window, treat it as Not Found
-            DateTime cachedTokenExpiration = _cache[securityToken];
-
-            if (DateTime.UtcNow <= cachedTokenExpiration)
-                return false;
-
-            // existing token is in cache and is not within time window, treat it as Found
-            return true;
-        }
-    }
-
-    public class LtiContext
-    {
-        public string id { get; set; }
-        public string label { get; set; }
-        public string[] type { get; set; }
-    }
-
-    public class LtiResourceLink
-    {
-        public string id { get; set; }
-        public string label { get; set; }
-        public string description { get; set; }
-    }
-
-    public class LtiPlatform
-    {
-        public string name { get; set; }
-        public string contact_email { get; set; }
-        public string description { get; set; }
-        public string url { get; set; }
-        public string product_family_code { get; set; }
-        public string version { get; set; }
-    }
-
-    public class LtiEndpoint
-    {
-        public string[] scope { get; set; }
-        public string lineitem { get; set; }
-        public string lineitems { get; set; }
-    }
-
-    public class LtiLaunchPresentation
-    {
-        public string document_target { get; set; }
-        public int height { get; set; }
-        public int width { get; set; }
-        public string return_url { get; set; }
     }
 }
